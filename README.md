@@ -1,75 +1,66 @@
 # ChIPs
 
-**UNDER CONSTRUCTION**
-
 ChIPs is a tool for simulating ChIP-sequencing experiments.
 
-For questions on installation or usage, please open an issue, submit a pull request, or contact An Zheng (anz023@eng.ucsd.edu).
+For questions on installation or usage, please open an issue, submit a pull request, or contact An Zheng (anz023@eng.ucsd.edu) & Melissa Gymrek (mgymrek@ucsd.edu).
 
-[Download](#download) | [Install](#install) | [From Docker](#docker) | [Basic Usage](#usage) | [Detailed usage](#detailed) | [File formats](#formats) | [FAQ](#faq)
+[Download](#download) | [Basic Usage](#usage) | [Detailed usage](#detailed) | [File formats](#formats) | [Usage example](#example) | [FAQ](#faq)
 
 <a name="download"></a>
-## Download
+## 1. Download
 
-The latest ChIPs release is available on the [releases page](https://github.com/gymreklab/chips/releases).
+### Through Anaconda
+ChIPs can be downloaded through Anaconda. \
+(Note: we just updated ChIPs to v2.4. This version has been submitted but not yet merged to bioconda. If you would like to use our latest version, please try other download methods.)
+
+If you don't have Anaconda or Miniconda installed on your machine, you can follow the installation instructions provided in the link below:\
+http://bioconda.github.io/user/install.html#install-packages
+
+After installing conda, you will need to add the bioconda channel as well as the other channels bioconda depends on. 
+```
+conda config --add channels defaults
+conda config --add channels bioconda
+conda config --add channels conda-forge
+```
+
+Once bioconda is enabled, you can download ChIPs using: `conda install chips`
+
+
+### From Github
+The latest ChIPs release is available on the [releases page](https://github.com/gymreklab/chips/releases)
 
 <a name="install"></a>
-## Installation
-### Install from Tarball
-Note: ChIPs uses a helper tool "pkg-config" in compilation, and requires a third party package [htslib](http://www.htslib.org/).
 
-You can use the following commands to install ChPs from the tarball file:
-```
-tar -xzvf chips-X.X.tar.gz
-cd chips-X.X
-./configure
-make
-make install
-``` 
+To compile from the Github repository, run:
 
-If you do not have root access, you can install ChIPs in a local directory with the commands:
-```
-./configure --prefix=$YOUR_PATH
-make
-make install
-```
-which installs `chips` to `$YOUR_PATH/bin/chips`.
-
-Typing `chips --help` should show a help message if ChIPs is successfully installed.
-
-If you get a pkg-config error, you may need to set the environment variable PKG_CONFIG_PATH to the directory containing `htslib.pc`. If you do not have htslib installed in your machine, you need to install htslib first. You can download the package from https://github.com/samtools/htslib/releases/, and install htslib with the following commands:
-```
-tar -xjvf htslib-1.8.tar.bz2
-cd htslib-1.8
-./configure --disable-lzma --disable-bz2 --prefix=$YOUR_PATH
-make
-make install
-```
-Once you succussfully install the htslib, you should set the environment variables `PKG_CONFIG_PATH` to the directory containing `htslib.pc` and `LD_LIBRARY_PATH` to the directory containing the `libhts.so*` files. e.g.:
-```
-export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:$YOUR_PATH/lib/pkgconfig
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$YOUR_PATH/lib
-```
-
-### Install from git source
-
-To compile from git source, first make sure htslib is installed. Then run:
 ```
 git clone https://github.com/gymreklab/chips
 cd chips/
-./reconf
-./configure
+mkdir build
+cd build/
+cmake ..
 make
-make install
 ```
 
-If installing from source on OSX, you will need to have autotools and related packages installed (ideally using Homebrew):
+### From source files
+To compile from source on the [releases page](https://github.com/gymreklab/chips/releases/tag/v2.2), download the file chips-2.2-Source.tar.gz and run:
+
 ```
-brew install autoconf automake autoconf-archive libtool pkg-config
+tar -xvf chips-2.4-Source.tar.gz
+cd chips-2.4-Source/
+mkdir build
+cd build/
+cmake ..
+make
 ```
+
+This will generate a binary file `chips`, which you can then copy to a place on your `$PATH`.
+
+There is also a precompiled binary available on the [release page](https://github.com/gymreklab/chips/releases/tag/v2.2). Download and unzip chips-2.2-Linux_x86_64.tar.gz and copy the binary located in `chips-2.2-Linux_x86_64/bin/chips` somewhere onto your `$PATH`. 
+
 
 <a name="usage"></a>
-## Basic usage
+## 2. Basic usage
 
 ChIPs is a single command line tool that contains several modules. To see available modules type:
 
@@ -89,6 +80,7 @@ chips learn \
   -b <reads.bam> \
   -p <peaks> \
   -t <homer|bed>
+  -c <int> \
   -o <outprefix>
 ```
 
@@ -101,26 +93,31 @@ chips simreads \
 ```
 
 <a name="detailed"></a>
-## Detailed usage
+## 3. Detailed usage
 
 ### chips learn
 
 Required parameters:
-* `-b <file.bam>`: BAM file containing aligned reads. Should be sorted and indexed. To accurately estimate PCR duplicate rate, duplicates must be flagged e.g. using Picard. Both paired-end or single-end data are supported.
 * `-p <peaks>`: file containing peaks. 
 * `-t <homer|bed>`: Specify the format of the peaks file. Options are "bed" or "homer".
-* `-c <int>`: The index of the BED or homer peak file column used to score each peak (index starting from 1)
 * `-o <outprefix>`: Prefix to name output files. Outputs file `<outprefix>.json` with learned model parameters.
+* `-b <file.bam>`: BAM file containing aligned reads. Should be sorted and indexed. To accurately estimate PCR duplicate rate, duplicates must be flagged e.g. using Picard. Both paired-end or single-end data are supported.
+* `-c <int>`: The index of the BED or homer peak file column used to score each peak (index starting from 1)
 
-Optional parameters for BAM parsing:
-* `--paired`: Data is paired
-* `--thres <float>`: For estimating fragment length distribution from single end data, only consider peaks with scores above this threshold.
+Optional parameters:
+* `-r <float>`: Ignore peaks with top r% of peak scores. Default: 0.
+* `--noscale`: Don't scale peak scores by the max score. Treat given scores in the input bed file as binding probabilities. Default: false.
+* `--scale-outliers`: Set all peaks with scores >3x median score to have binding prob 1. Recommended with real data. Default: flase.
+* `--region <str>`: Only consider peaks from this region chrom:start-end. Default: genome-wide.
 
-Other optional parameters:
-* `--scale-outliers`: Set all peaks with scores $>$2x median score to have binding prob 1. Recommended with real data.
-* `--noscale`: Don't scale peak scores. Treat given scores as binding probabilities.
-* `--est <int>`: Estimated fragment length. Used as a rough guess to guide inference of fragment length distribution from single end data.
-* `-r <float>`: Ignore peaks with top r% of peak scores.
+BAM-file arguments:
+* `--paired`: Data is paired. Default: false.
+
+Fragment length estimation arguments (for single-end data only):
+* `--est <int>`: Estimated fragment length. Used as a rough guess to guide inference of fragment length distribution from single end data. Please set this number as the loose upper-bound of your best estimation. This can result in more robust estimates especially for data with narrow peaks. Default: 300.
+* `--thres <float>`: For estimating fragment length distribution from single end data, only consider peaks with scores above this threshold. ChIPs applies `--thres` or `--thres-scale` whichever is stricter. Default: 100.
+* `--thres-scale <float>`: Scale threshold for peak scores. Only consider peaks with at least this score after scaling scores to be between 0-1. ChIPs applies `--thres` or `--thres-scale` whichever is stricter. Default: 0.
+
 
 ### chips simreads
 
@@ -138,17 +135,17 @@ Experiment parameters:
 
 Model parameters: (either user-specified or learned from `chips learn`:
 * `--model <str>`: JSON file with model parameters (e.g. from running learn. Setting parameters with other options overrides anything in the JSON file.
-* `--gamma-frag <float>,<float>`: Parameters for fragment length distribution (k, theta for Gamma distribution). Default: 15.67,15,49
-* `--spot <float>`: SPOT score (fraction of reads in peaks). Default: 0.18
-* `--frac <float>`: Fraction of the genome that is bound. Default: 0.03
-* `--pcr_rate <float>`: The geometric step size paramters for simulating PCR. Default: 1.0.
+* `--gamma-frag <float>,<float>`: Parameters for fragment length distribution (k, theta for Gamma distribution). Default: 15.67,15.49
+* `--spot <float>`: SPOT score (fraction of reads in peaks). Default: 0.17594
+* `--frac <float>`: Fraction of the genome that is bound. Default: 0.03713
+* `--pcr_rate <float>`: The geometric step size paramters for simulating PCR. Default: 1.
 * `--recomputeF`: Recompute `--frac` param based on input peaks. Recommended especially when using model parameters that were not learned on real data.
 
 Peak scoring:
 * `-b <reads.bam>`: Use a provided BAM file to obtain scores for each peak (optional). If a BAM is not given, scores in the peak files are used.
 * `-c <int>`: The index of the BED or homer peak file column used to score each peak (index starting from 1). Required if not using `-b`.
-* `--scale-outliers`: Set all peaks with scores >2x median score to have binding prob 1. Recommended with real data.
-* `--noscale`: Don't scale peak scores. Treat given scores as binding probabilities.
+* `--scale-outliers`: Set all peaks with scores >3x median score to have binding prob 1. Recommended with real data. Default: false.
+* `--noscale`: Don't scale peak scores. Treat given scores as binding probabilities. Default: false.
 
 Other options:
 * `--seed <unsigned>`: The random seed used for initiating randomization opertions. By default or 0, use wall-clock time.
@@ -161,7 +158,7 @@ Other options:
 * `--del <float>`: Deletion error rate. Default: 0.
 
 <a name="formats"></a>
-## Formats
+## 4. Formats
 
 ### Peak files
 
@@ -191,8 +188,56 @@ Model files are in JSON syntax, and follow the example below.
 
 `chips learn` outputs a JSON model file. `chips simreads` can take in a model file with all or some of these parameters specified. Model parameters set on the command line override those set in the JSON model file. 
 
+<a name="example"></a>
+
+## 5. Usage Example
+In this toy example, we use the following `sample.bed` as input for read simulation.
+```
+sample.bed:
+chr21    10001100   10001400    10  
+chr21    10002500   10002800    20  
+chr21    10004100   10004900    60  
+chr21    10005900   10006800    100
+```
+First, we can use `chips simreads` to simulate reads.
+```
+chips simreads -p sample.bed -t bed -c 4 -f {PATH-TO-HG19}/hg19.fa -o sample --numcopies 1000 --numreads 10000 --readlen 36 --paired --gamma-frag 15,15 --spot 0.8 --frac 0.15 --pcr_rate 0.8 --region chr21:10000000-10010000
+```
+
+Next, we use `bowtie`, `samtools`, `picard`, and `igvtools` to map simulated reads to the reference genome and generate a sorted BAM file. You can use IGV to visualize the BAM file ([screen shot](https://drive.google.com/file/d/1DReo-hIWwT2oC533g67EWb-FDUaJ23Sb/view?usp=sharing)).
+```
+bowtie2 -x {PATH-TO-HG19}/hg19 -1 sample_1.fastq -2 sample_2.fastq > tmp.sam 
+samtools view -bS tmp.sam > tmp.bam
+samtools sort tmp.bam -o tmp.sorted.bam
+samtools index tmp.sorted.bam
+samtools view tmp.sorted.bam chr21:10000000-10010000 -b -o tmp.trimmed.bam
+samtools index tmp.trimmed.bam
+java -jar {PATH-TO-picard}/picard.jar MarkDuplicates -I tmp.trimmed.bam -O tmp.flagged.bam -M tmp.metrics
+samtools index tmp.flagged.bam
+igvtools count -z 5 -w 25 -e 0 tmp.flagged.bam tmp.tdf /storage/resources/dbase/human/hg19/hg19.fa
+```
+
+Last, we use `chips learn` to estimate the parameters in ChIP-seq simulation.
+```
+chips learn -b tmp.flagged.bam -p sample.bed -t bed -c 4 -o sample --region chr21:10000000-10010000 --paired
+```
+The esitmations can be found in `sample.json`.
+```
+{
+    "frag": {
+        "k": 15.783836364746094,
+        "theta": 14.306901931762695
+    },  
+    "pcr_rate": 0.7234475612640381,
+    "pulldown": {
+        "f": 0.15454448759555817,
+        "s": 0.8646870851516724
+    }   
+}
+```
+
 <a name="faq"></a>
-## FAQ
+## 6. FAQ
 
 **Q**: What should I set the number of genome copies (`--numcopies`) parameter to for `simreads`?<br>
 **A**: This gives the number of simulation rounds to perform. This number is not directly comparable to the actual number of cells used in an experiment since we do not currently model pulldown inefficiency. We have found that for histone modifications performance starts to plateau after around 25 copies (`--numcopies 25`). For transcription factors we recommend setting `--numcopies 1000`. Note, run time increases linearly with the value set for this parameter.
@@ -201,5 +246,5 @@ Model files are in JSON syntax, and follow the example below.
 **A**: Make sure duplicates are marked, e.g. using [Picard MarkDuplicates](https://broadinstitute.github.io/picard/command-line-overview.html#MarkDuplicates).
 <br><br>
 **Q**: What should I do if I want to replicate my simulation experiment?<br>
-**A**: Each time you run Tulip, it prints in your console the random seed being used. If you want to replicate this simulation experiment, you can simply set up `--seed` option in the simreads module with that random seed. Note: if you are using multi-threads in your work, the order of output reads in the fastq file may be different in each repeated experiment, because threads claim their jobs in an arbitrary manner during run-time. The total contents, however, stay the same in different runs.
+**A**: Each time you run ChIPs, it prints in your console the random seed being used. If you want to replicate this simulation experiment, you can simply set up `--seed` option in the simreads module with that random seed. Note: if you are using multi-threads in your work, the order of output reads in the fastq file may be different in each repeated experiment, because threads claim their jobs in an arbitrary manner during run-time. The total contents, however, stay the same in different runs.
 
